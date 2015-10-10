@@ -5,9 +5,7 @@ using System.Collections;
 public class Enemy : LivingEntity
 {
     public enum State { Idle, Chasing, Attacking}
-    State currentState;
-
-
+    private State currentState;
     private NavMeshAgent pathfinder; // caminho
     private Transform target; // player
 
@@ -15,43 +13,64 @@ public class Enemy : LivingEntity
     [SerializeField] private float attackDistanceThereshold = 1.5f; // distancia para ataque
     [SerializeField] private float timeBetweenAttacks = 1f; //tempo entre um ataque e outro
     [SerializeField] private float timeNextAttack; // tempo para o proximo ataque
+    [SerializeField] private float damage = 1f; // valor do dano para player
 
     private float myCollisionRadius;
     private float targetCollisionRadius;
     private Material skinMaterial;
     private Color originalColor;
+
+    private LivingEntity targetEntity; //alvo vivo
+
+    private bool hasTarget;
+
     private void Awake()
     {
-        pathfinder = GetComponent<NavMeshAgent>();
-        target = GameObject.FindGameObjectWithTag("Player").transform;
     }
 
     protected override void Start()
     {
         base.Start();
-        currentState = State.Chasing;
-
-        myCollisionRadius = GetComponent<CapsuleCollider>().radius; //pega o raio do collider do enemy
-        targetCollisionRadius = target.GetComponent<CapsuleCollider>().radius; // pega o collider do player
+        pathfinder = GetComponent<NavMeshAgent>();
         skinMaterial = GetComponent<Renderer>().material;
         originalColor = skinMaterial.color; // pega a cor original do object
 
-        StartCoroutine(UpdatePath());
+        if (GameObject.FindGameObjectWithTag("Player") != null)
+        {
+            currentState = State.Chasing;
+            hasTarget = true;
+            target = GameObject.FindGameObjectWithTag("Player").transform;
+
+            targetEntity = target.GetComponent<LivingEntity>();
+            targetEntity.OnDeath += OnTargetDeath;
+
+            myCollisionRadius = GetComponent<CapsuleCollider>().radius; //pega o raio do collider do enemy
+            targetCollisionRadius = target.GetComponent<CapsuleCollider>().radius; // pega o collider do player
+            StartCoroutine(UpdatePath());
+        }
     }
     	
 	// Update is called once per frame
 	void Update ()
     {
-        if (Time.time > timeNextAttack)
+        if (hasTarget)
         {
-            float sqrDstTarget = (target.position - transform.position).sqrMagnitude;
-            if (sqrDstTarget < Mathf.Pow(attackDistanceThereshold + myCollisionRadius + targetCollisionRadius, 2))
+            if (Time.time > timeNextAttack)
             {
-                timeNextAttack = Time.time + timeBetweenAttacks;
-                StartCoroutine(Attack());
+                float sqrDstTarget = (target.position - transform.position).sqrMagnitude;
+                if (sqrDstTarget < Mathf.Pow(attackDistanceThereshold + myCollisionRadius + targetCollisionRadius, 2))
+                {
+                    timeNextAttack = Time.time + timeBetweenAttacks;
+                    StartCoroutine(Attack());
+                }
             }
-
         }
+    }
+
+    private void OnTargetDeath()
+    {
+        hasTarget = false;
+        currentState = State.Idle;
     }
 
     private IEnumerator Attack()
@@ -67,8 +86,16 @@ public class Enemy : LivingEntity
         float percent = 0;
         float attackSpeed = 3;
         skinMaterial.color = Color.magenta;
+
+        bool hasAppliedDamage = false;
+
         while (percent <= 1)
         {
+            if (percent >= .5f && !hasAppliedDamage)
+            {
+                hasAppliedDamage = true;
+                targetEntity.TakeDamage(damage);
+            }
             percent += Time.deltaTime * attackSpeed;
             float interpolation = (-Mathf.Pow(percent, 2) + percent) * 4;
             transform.position = Vector3.Lerp(originalPosition, attackPosition, interpolation);
@@ -83,7 +110,8 @@ public class Enemy : LivingEntity
 
     private IEnumerator UpdatePath()
     {
-        while (target != null)
+        float refreshRate = .25f;
+        while (hasTarget)
         {
             if (currentState == State.Chasing)
             {

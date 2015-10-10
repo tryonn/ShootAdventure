@@ -8,27 +8,36 @@ public class LivingEntity : MonoBehaviour, IDamageable
     protected float health;
     protected bool dead;
 
+    public event Action OnDeath;
+
     protected virtual void Start()
     {
         health = startingHealth;
     }
-    public void TakeHit(float damage, RaycastHit hit)
+    public void TakeHit(float _damage, RaycastHit hit)
     {
-        health -= damage;
-
-        if (health <= 0 && !dead)
-        {
-            Debug.Log("health: " + health);
-            Die();
-        }
+        // do some stuff with hit var
+        TakeDamage(_damage);
     }
 
     protected void Die()
     {
-        Debug.Log("Die");
         dead = true;
+        if (OnDeath != null)
+        {
+            OnDeath();
+        }
         GameObject.Destroy(gameObject);
+        Debug.Log(gameObject.name);
+    }
 
-        Debug.Log("Die.. Die");
+    public void TakeDamage(float _damage)
+    {
+        health -= _damage;
+
+        if (health <= 0 && !dead)
+        {
+            Die();
+        }
     }
 }

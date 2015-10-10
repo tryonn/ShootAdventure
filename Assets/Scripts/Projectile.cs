@@ -8,6 +8,17 @@ public class Projectile : MonoBehaviour {
     [SerializeField] private LayerMask collisionMask;
     [SerializeField] private float damage;
 
+    private float liveTime = 3f;
+
+    private void Start()
+    {
+        Destroy(gameObject, liveTime);
+        Collider[] initialCollisions = Physics.OverlapSphere(transform.position, .1f, collisionMask);
+        if (initialCollisions.Length > 0)
+        {
+            OnHitObject(initialCollisions[0]);
+        }
+    }
 
     public void SetSpeed(float _speed)
     {
@@ -40,6 +51,16 @@ public class Projectile : MonoBehaviour {
         {
             Debug.Log(damage);
             damageableObject.TakeHit(damage, hit);
+        }
+        GameObject.Destroy(gameObject);
+    }
+
+    private void OnHitObject(Collider c)
+    {
+        IDamageable damageableObject = c.GetComponent<IDamageable>();
+        if (damageableObject != null)
+        {
+            damageableObject.TakeDamage(damage);
         }
         GameObject.Destroy(gameObject);
     }
